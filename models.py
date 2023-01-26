@@ -4,6 +4,17 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import List
+
+
+def make_mlp_layer(
+  neurons_in:int,
+  neurons_out:int,
+  activation_function,
+  bias:bool
+) -> List:
+  return [nn.Linear(neurons_in, neurons_out, bias=bias), activation_function()]
+
 
 class LinearBase(nn.Module):
   def __init__(self, input_size, output_size):
@@ -32,6 +43,32 @@ class MLPBase(nn.Module):
     h = self.linear1(x).relu()
     h = h + self.linear2(h).relu()
     return self.linear3(h)
+
+class MLP(nn.Module):
+  def __init__(
+    self,
+    input_size:int,
+    output_size:int=10,
+    hidden_size:int=100,
+    depth:int=3,
+    activation_function=nn.ReLU,
+    bias:bool=True,
+  ) -> None:
+    super(MLP, self).__init__()
+
+    layers = []
+    for i in range(depth):
+      if i == 0:
+        neurons_in = input_size
+      else:
+        neurons_in = hidden_size
+      neurons_out = hidden_size if i < depth-1 else output_size
+      layers.append(make_mlp_layer(neurons_in, neurons_out, activation_function, bias))
+
+    self.network = nn.Sequential(layers)
+  
+  def forward(self, x:torch.Tensor) -> torch.Tensor:
+    return self.network(x)
 
 class ConvBase(nn.Module):
     def __init__(self, output_size, channels=25, linear_in=125):
