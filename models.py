@@ -11,9 +11,24 @@ def make_mlp_layer(
   neurons_in:int,
   neurons_out:int,
   activation_function,
-  bias:bool
+  bias:bool,
+  batchnorm:bool
 ) -> List:
-  return [nn.Linear(neurons_in, neurons_out, bias=bias), activation_function()]
+  if batchnorm:
+    modules = [nn.BatchNorm1d(neurons_in)]
+  return modules + [nn.Linear(neurons_in, neurons_out, bias=bias), activation_function()]
+
+def make_conv_layer(
+  channels_in:int,
+  channels_out:int,
+  kernel_size:int,
+  activation_function,
+  bias:bool,
+  batchnorm:bool
+) -> List:
+  if batchnorm:
+    modules = [nn.BatchNorm1d(channels_in)]
+  return modules + [nn.Conv1d(channels_in, channels_out, kernel_size, bias=bias), activation_function()]
 
 
 class LinearBase(nn.Module):
@@ -53,22 +68,52 @@ class MLP(nn.Module):
     depth:int=3,
     activation_function=nn.ReLU,
     bias:bool=True,
+    batchnorm:bool=True
   ) -> None:
     super(MLP, self).__init__()
 
     layers = []
     for i in range(depth):
+      neurons_out = hidden_size if i < depth-1 else output_size
       if i == 0:
         neurons_in = input_size
       else:
         neurons_in = hidden_size
-      neurons_out = hidden_size if i < depth-1 else output_size
-      layers.append(make_mlp_layer(neurons_in, neurons_out, activation_function, bias))
+      layers.append(make_mlp_layer(neurons_in, neurons_out, activation_function, bias, batchnorm=(batchnorm and i>0)))
 
     self.network = nn.Sequential(layers)
   
   def forward(self, x:torch.Tensor) -> torch.Tensor:
     return self.network(x)
+
+class CNN(nn.Module):
+  def __init__(
+    self,
+    input_size:int,
+    output_size:int=10,
+    num_layers:int=3,
+    kernel_size:int=3,
+    base_width:int=16,
+    activation_function=nn.ReLU,
+    bias:bool=True,
+    batchnorm:bool=True
+  ) -> None:
+    layers = []
+    in_channels = [1] + [base_width*i for i in range(1, num_layers)]
+    out_channels = [base_width*i for i in range(1, num_layers+1)]
+    for i in range(num_layers):
+      layers.append(make_conv_layer(in_channels[i], out_channels[i], kernel_size, activation_function, bias, batchnorm=(batchnorm and i>0)))
+
+    layers.append(nn.AdaptiveAvgPool1d(1))
+    layers.append(nn.Flatten())
+    layers.append(nn.Linear(out_channels, output_size, bias=bias))
+
+    
+    self.network = nn.Sequential(layers)
+  
+  def forward(self, x:torch.Tensor) -> torch.Tensor:
+    return self.network(x)
+    
 
 class ConvBase(nn.Module):
     def __init__(self, output_size, channels=25, linear_in=125):
