@@ -6,7 +6,7 @@ import torch
 import random
 import pickle
 import matplotlib.pyplot as plt
-from .transform import transform
+from transform import transform
 
 def set_seed(seed):
     random.seed(seed)
@@ -55,3 +55,22 @@ def plot_signals(xs, t, labels=None, args=None, ratio=2.6, do_transform=False, d
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.tight_layout() ; plt.show()
     return fig
+
+def accuracy(inputs, targets):
+  return (inputs.argmax(dim=1) == targets).float().mean().item()
+
+class AverageMeter():
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+    
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

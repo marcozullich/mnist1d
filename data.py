@@ -4,8 +4,14 @@
 import numpy as np
 import os
 import requests
-from .transform import transform
-from .utils import from_pickle, to_pickle, ObjectView, set_seed
+
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+from typing import Dict
+from transform import transform
+from utils import from_pickle, to_pickle, ObjectView, set_seed
+
 
 def get_dataset_args(as_dict=False):
     arg_dict = {'num_samples': 5000,
@@ -113,3 +119,52 @@ def get_dataset(args, path=None, verbose=True, download=True, regenerate=False, 
         dataset = make_dataset(args, **kwargs)
         to_pickle(dataset, path)
     return dataset
+
+def adjust_dimensions_for_torch(data:Dict[str, np.ndarray]):
+    '''
+    Modifies existing datasets by adding a channel dimension, as requested by PyTorch
+    '''
+    if len(data['x'].shape) == 2:
+        for key in ["x", "x_test"]:
+            data[key] = data[key].reshape(data[key].shape[0], 1, data[key].shape[1])
+    return data
+
+def data_to_dataloaders(
+    data: Dict[str, np.ndarray],
+    batch_size: int,
+    **kwargs
+):
+    """
+    Converts data dictionary to dataloaders for training and testing
+
+    Parameters
+    ----------
+    data : Dict[str, np.ndarray]
+        Dictionary containing data with keys 'x', 'y', 'x_test', 'y_test'
+    batch_size : int
+        Batch size for dataloaders
+    **kwargs
+        Keyword arguments for DataLoader
+    """
+    data = adjust_dimensions_for_torch(data)
+    train_data = TensorDataset(
+        torch.from_numpy(data['x']).float(),
+        torch.from_numpy(data['y']).long()
+    )
+    test_data = TensorDataset(
+        torch.from_numpy(data['x_test']).float(),
+        torch.from_numpy(data['y_test']).long()
+    )
+    train_loader = DataLoader(
+        train_data,
+        batch_size=batch_size,
+        shuffle=True,
+        **kwargs
+    )
+    test_loader = DataLoader(
+        test_data,
+        batch_size=batch_size,
+        shuffle=False,
+        **kwargs
+    )
+    return train_loader, test_loader

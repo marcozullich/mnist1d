@@ -14,8 +14,9 @@ def make_mlp_layer(
   bias:bool,
   batchnorm:bool
 ) -> List:
+  modules = []
   if batchnorm:
-    modules = [nn.BatchNorm1d(neurons_in)]
+    modules.append([nn.BatchNorm1d(neurons_in)])
   return modules + [nn.Linear(neurons_in, neurons_out, bias=bias), activation_function()]
 
 def make_conv_layer(
@@ -26,8 +27,9 @@ def make_conv_layer(
   bias:bool,
   batchnorm:bool
 ) -> List:
+  modules = []
   if batchnorm:
-    modules = [nn.BatchNorm1d(channels_in)]
+    modules.append[nn.BatchNorm1d(channels_in)]
   return modules + [nn.Conv1d(channels_in, channels_out, kernel_size, bias=bias), activation_function()]
 
 
@@ -60,6 +62,26 @@ class MLPBase(nn.Module):
     return self.linear3(h)
 
 class MLP(nn.Module):
+  '''
+  A simple multi-layer perceptron with custom activations and optional batchnorm.
+
+  Parameters
+  ----------
+  input_size : int
+    Number of input features
+  output_size : int
+    Number of output features
+  hidden_size : int
+    Number of neurons in each hidden layer
+  depth : int
+    Number of hidden layers
+  activation_function
+    The activation function to use
+  bias : bool
+    Whether to use bias in the linear layers
+  batchnorm : bool
+    Whether to use batchnorm in the hidden layers
+  '''
   def __init__(
     self,
     input_size:int,
@@ -79,14 +101,36 @@ class MLP(nn.Module):
         neurons_in = input_size
       else:
         neurons_in = hidden_size
-      layers.append(make_mlp_layer(neurons_in, neurons_out, activation_function, bias, batchnorm=(batchnorm and i>0)))
+      layers += make_mlp_layer(neurons_in, neurons_out, activation_function, bias, batchnorm=(batchnorm and i>0))
 
-    self.network = nn.Sequential(layers)
+    self.network = nn.Sequential(*layers)
   
   def forward(self, x:torch.Tensor) -> torch.Tensor:
     return self.network(x)
 
 class CNN(nn.Module):
+  '''
+  A simple convolutional neural network with custom activations and optional batchnorm.
+
+  Parameters
+  ----------
+  input_size : int
+    Number of input features
+  output_size : int
+    Number of output features
+  num_layers : int
+    Number of convolutional layers
+  kernel_size : int
+    Size of the convolutional kernel
+  base_width : int
+    Number of channels in the first layer
+  activation_function
+    The activation function to use
+  bias : bool
+    Whether to use bias in the convolutional layers
+  batchnorm : bool
+    Whether to use batchnorm in the convolutional layers
+  '''
   def __init__(
     self,
     input_size:int,
@@ -98,18 +142,20 @@ class CNN(nn.Module):
     bias:bool=True,
     batchnorm:bool=True
   ) -> None:
+    super(CNN, self).__init__()
+
     layers = []
     in_channels = [1] + [base_width*i for i in range(1, num_layers)]
     out_channels = [base_width*i for i in range(1, num_layers+1)]
     for i in range(num_layers):
-      layers.append(make_conv_layer(in_channels[i], out_channels[i], kernel_size, activation_function, bias, batchnorm=(batchnorm and i>0)))
+      layers += make_conv_layer(in_channels[i], out_channels[i], kernel_size, activation_function, bias, batchnorm=(batchnorm and i>0))
 
     layers.append(nn.AdaptiveAvgPool1d(1))
     layers.append(nn.Flatten())
-    layers.append(nn.Linear(out_channels, output_size, bias=bias))
+    layers.append(nn.Linear(out_channels[-1], output_size, bias=bias))
 
     
-    self.network = nn.Sequential(layers)
+    self.network = nn.Sequential(*layers)
   
   def forward(self, x:torch.Tensor) -> torch.Tensor:
     return self.network(x)
