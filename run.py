@@ -18,6 +18,7 @@ def get_args():
     parser.add_argument('--hidden_size', type=int, default=16, help="Hidden size for layers. For MLP → number of neurons, for CNN → base width of number of channels (output dim = base_width * layer #)")
     parser.add_argument('--kernel_size', type=int, default=5, help="Kernel size for CNN (default: 5)")
     parser.add_argument('--activation_function', type=str, default='ReLU', help="Activation function. Choose any subclass of torch.nn.Module or activations.py (default: ReLU)")
+    parser.add_argument("--flashsigmoid_xbar", type=float, default=0.5, help="x_bar for FlashSigmoid (default: 0.5). No effect for other activation functions.")
     parser.add_argument('--batchnorm', action='store_true', help="Use batchnorm (default: False)")
     parser.add_argument('--bias', action='store_true', help="Use bias (default: False)")
     parser.add_argument('--data', type=str, default='mnist1d_data.pkl', help="Path to data (default: data.pkl)")
@@ -25,6 +26,8 @@ def get_args():
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate (default: 0.001)")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum (default: 0.9)")
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay (default: 0.0005)")
+    parser.add_argument("--lr_decay_plateau", action='store_true', help="Use ReduceLROnPlateau for learning rate annealing (default: False)")
+    parser.add_argument("--lr_decay_patience", type=int, default=10, help="Patience for ReduceLROnPlateau (default: 5)")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size (default: 64)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
     parser.add_argument("--save_folder", type=str, default='results', help="Folder to save results (default: results)")
@@ -40,6 +43,7 @@ def debug_mode(args):
     args.hidden_size = 16
     args.kernel_size = 5
     args.activation_function = 'ReLU'
+    args.flashsigmoid_xbar = 0.5
     args.batchnorm = False
     args.bias = False
     args.data = 'mnist1d_data.pkl'
@@ -57,11 +61,13 @@ def get_data(location:str) -> dict:
         data = pkl.load(f)
     return data
 
-def get_activation(name):
+def get_activation(name, flashsigmoid_xbar):
     '''
     Get activation function from activations.py (prioritized) or torch.nn (fallback).
     '''
     try:
+        if name == "FlashSigmoid":
+            return lambda : activations.FlashSigmoid(flashsigmoid_xbar)
         return getattr(activations, name)
     except AttributeError:
         try:
@@ -88,9 +94,6 @@ def save_model(model, path, args):
     df.to_csv(os.path.join(path, "results.csv"), index=False)
 
 
-
-
-
 def init():
     args = get_args()
     if args.debug:
@@ -101,7 +104,7 @@ def init():
     trainloader, testloader = data_to_dataloaders(data_dict, args.batch_size, num_workers=8)
     print("Created trainloader and testloader")
 
-    activation_function = get_activation(args.activation_function)
+    activation_function = get_activation(args.activation_function, args.flashsigmoid_xbar)
 
     if args.model == 'MLP':
         model = MLP(input_size=input_dim, output_size=10, hidden_size=args.hidden_size, depth=args.num_layers, activation_function=activation_function, bias=args.bias, batchnorm=args.batchnorm)
@@ -115,9 +118,16 @@ def init():
         optimizer_class = getattr(torch.optim, args.optimizer)
     except AttributeError:
         raise ValueError(f"Optimizer {args.optimizer} not supported or not recognized.")
-    optimizer = optimizer_class(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    if args.optimizer == "SGD":
+        optimizer = optimizer_class(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    else:
+        optimizer = optimizer_class(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
-    train_results = train_model(args.epochs, trainloader, model, optimizer, torch.nn.CrossEntropyLoss(), args.device)
+    scheduler = None
+    if args.lr_decay_plateau:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.lr_decay_patience, verbose=True)
+
+    train_results = train_model(args.epochs, trainloader, model, optimizer, torch.nn.CrossEntropyLoss(), args.device, scheduler)
     test_results = eval_model(testloader, model, torch.nn.CrossEntropyLoss(), args.device)
 
     args.train_accuracy = train_results["train_acc"][-1]

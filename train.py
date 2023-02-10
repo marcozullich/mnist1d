@@ -19,6 +19,7 @@ def train_model(
   model:nn.Module,
   optimizer:optim.Optimizer,
   criterion:nn.Module,
+  scheduler:optim.lr_scheduler._LRScheduler=None,
   device:Union[str, torch.device]=None
 ):
   # criterion = nn.CrossEntropyLoss()
@@ -48,13 +49,16 @@ def train_model(
       loss.backward()
       optimizer.step()
 
-      loss_val = loss.item()
-      acc_val = accuracy(prediction, target)
+      loss_value = loss.item()
+      acc_value = accuracy(prediction, target)
+      if scheduler is not None:
+        # NB: step on train loss, not validation loss
+        scheduler.step(loss_value)
 
-      results["train_loss"].append(loss_val)
-      results["train_acc"].append(acc_val)
+      results["train_loss"].append(loss_value)
+      results["train_acc"].append(acc_value)
 
-      loss_meter.update(loss_val, data.size(0))
+      loss_meter.update(loss_value, data.size(0))
       acc_meter.update(accuracy(prediction, target), data.size(0))
     
     print(f"Epoch {epoch+1}/{num_epochs} | Loss: {loss_meter.avg:.4f} | Acc: {acc_meter.avg:.4f}")
@@ -80,10 +84,10 @@ def eval_model(
     prediction = model(data)
     loss = criterion(prediction, target)
 
-    loss_val = loss.item()
-    acc_val = accuracy(prediction, target)
+    loss_value = loss.item()
+    acc_value = accuracy(prediction, target)
 
-    loss_meter.update(loss_val, data.size(0))
+    loss_meter.update(loss_value, data.size(0))
     acc_meter.update(accuracy(prediction, target), data.size(0))
   
   print(f"Loss: {loss_meter.avg:.4f} | Acc: {acc_meter.avg:.4f}")

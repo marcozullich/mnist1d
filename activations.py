@@ -1,6 +1,13 @@
 import torch
 from torch import nn
 
+class SoftSign(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x:torch.Tensor) -> torch.Tensor:
+        return nn.functional.softsign(x)
+
 class FlashSigmoid(nn.Module):
     def __init__(self, x_bar:float):
         super().__init__()
