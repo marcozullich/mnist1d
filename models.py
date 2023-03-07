@@ -16,7 +16,7 @@ def make_mlp_layer(
 ) -> List:
   modules = []
   if batchnorm:
-    modules.append([nn.BatchNorm1d(neurons_in)])
+    modules.append(nn.BatchNorm1d(neurons_in))
   return modules + [nn.Linear(neurons_in, neurons_out, bias=bias), activation_function()]
 
 def make_conv_layer(
@@ -29,7 +29,7 @@ def make_conv_layer(
 ) -> List:
   modules = []
   if batchnorm:
-    modules.append[nn.BatchNorm1d(channels_in)]
+    modules.append(nn.BatchNorm1d(channels_in))
   return modules + [nn.Conv1d(channels_in, channels_out, kernel_size, bias=bias), activation_function()]
 
 

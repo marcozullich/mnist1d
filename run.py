@@ -28,6 +28,7 @@ def get_args():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay (default: 0.0005)")
     parser.add_argument("--lr_decay_plateau", action='store_true', help="Use ReduceLROnPlateau for learning rate annealing (default: False)")
     parser.add_argument("--lr_decay_patience", type=int, default=10, help="Patience for ReduceLROnPlateau (default: 5)")
+    parser.add_argument("--gradient_clip_norm", type=float, default=None, help="Norm gradient clipping to specified value (default: None -> no clipping). If 0.0, no clipping is performed.")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size (default: 64)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
     parser.add_argument("--save_folder", type=str, default='results', help="Folder to save results (default: results)")
@@ -39,21 +40,23 @@ def get_args():
 
 def debug_mode(args):
     args.model = 'CNN'
-    args.num_layers = 3
-    args.hidden_size = 16
+    args.num_layers = 1
+    args.hidden_size = 48
     args.kernel_size = 5
-    args.activation_function = 'ReLU'
+    args.activation_function = 'ShiftedFlashSigmoid'
     args.flashsigmoid_xbar = 0.5
-    args.batchnorm = False
-    args.bias = False
+    args.batchnorm = True
+    args.bias = True
     args.data = 'mnist1d_data.pkl'
     args.optimizer = 'SGD'
-    args.lr = 0.1
+    args.lr = 0.5
     args.momentum = 0.9
     args.weight_decay = 0.0005
     args.batch_size = 64
-    args.epochs = 10
+    args.epochs = 30
     args.save_folder = 'results'
+    args.gradient_clip_norm = None
+    args.lr_decay_plateau = True
     return args
 
 def get_data(location:str) -> dict:
@@ -68,6 +71,8 @@ def get_activation(name, flashsigmoid_xbar):
     try:
         if name == "FlashSigmoid":
             return lambda : activations.FlashSigmoid(flashsigmoid_xbar)
+        elif name == "ShiftedFlashSigmoid":
+            return lambda : activations.ShiftedFlashSigmoid(flashsigmoid_xbar)
         return getattr(activations, name)
     except AttributeError:
         try:
@@ -94,14 +99,14 @@ def save_model(model, path, args):
     df.to_csv(os.path.join(path, "results.csv"), index=False)
 
 
-def init():
+def main():
     args = get_args()
     if args.debug:
         args = debug_mode(args)
 
     data_dict = get_data(args.data)
     input_dim = data_dict['x'].shape[1]
-    trainloader, testloader = data_to_dataloaders(data_dict, args.batch_size, num_workers=8)
+    trainloader, testloader = data_to_dataloaders(data_dict, args.batch_size, num_workers=8, is_cnn=(args.model == 'CNN'))
     print("Created trainloader and testloader")
 
     activation_function = get_activation(args.activation_function, args.flashsigmoid_xbar)
@@ -127,7 +132,7 @@ def init():
     if args.lr_decay_plateau:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.lr_decay_patience, verbose=True)
 
-    train_results = train_model(args.epochs, trainloader, model, optimizer, torch.nn.CrossEntropyLoss(), args.device, scheduler)
+    train_results = train_model(args.epochs, trainloader, model, optimizer, torch.nn.CrossEntropyLoss(), device=args.device, scheduler=scheduler)
     test_results = eval_model(testloader, model, torch.nn.CrossEntropyLoss(), args.device)
 
     args.train_accuracy = train_results["train_acc"][-1]
@@ -137,4 +142,4 @@ def init():
 
 
 if __name__ == "__main__":
-    init()
+    main()

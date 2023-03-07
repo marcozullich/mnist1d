@@ -120,18 +120,20 @@ def get_dataset(args, path=None, verbose=True, download=True, regenerate=False, 
         to_pickle(dataset, path)
     return dataset
 
-def adjust_dimensions_for_torch(data:Dict[str, np.ndarray]):
+def adjust_dimensions_for_torch(data:Dict[str, np.ndarray], is_cnn:bool):
     '''
     Modifies existing datasets by adding a channel dimension, as requested by PyTorch
     '''
-    if len(data['x'].shape) == 2:
-        for key in ["x", "x_test"]:
-            data[key] = data[key].reshape(data[key].shape[0], 1, data[key].shape[1])
+    if is_cnn:
+        if len(data['x'].shape) == 2:
+            for key in ["x", "x_test"]:
+                data[key] = data[key].reshape(data[key].shape[0], 1, data[key].shape[1])
     return data
 
 def data_to_dataloaders(
     data: Dict[str, np.ndarray],
     batch_size: int,
+    is_cnn: bool,
     **kwargs
 ):
     """
@@ -146,7 +148,7 @@ def data_to_dataloaders(
     **kwargs
         Keyword arguments for DataLoader
     """
-    data = adjust_dimensions_for_torch(data)
+    data = adjust_dimensions_for_torch(data, is_cnn)
     train_data = TensorDataset(
         torch.from_numpy(data['x']).float(),
         torch.from_numpy(data['y']).long()
