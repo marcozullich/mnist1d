@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay (default: 0.0005)")
     parser.add_argument("--lr_decay_plateau", action='store_true', help="Use ReduceLROnPlateau for learning rate annealing (default: False)")
     parser.add_argument("--lr_decay_patience", type=int, default=10, help="Patience for ReduceLROnPlateau (default: 10)")
-    parser.add_argument("--lr_decay_factor", type=int, default=0.1, help="Reduction factor ReduceLROnPlateau (default: 0.1)")
+    parser.add_argument("--lr_decay_factor", type=float, default=0.1, help="Reduction factor ReduceLROnPlateau (default: 0.1)")
     parser.add_argument("--gradient_clip_norm", type=float, default=None, help="Norm gradient clipping to specified value (default: None -> no clipping). If 0.0, no clipping is performed.")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size (default: 64)")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs (default: 10)")
