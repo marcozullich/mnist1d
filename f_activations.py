@@ -25,7 +25,7 @@ class FlashSigmoid(torch.autograd.Function):
 def flashsigmoid_function(x, x_bar):
     k_1 = x_bar * x_bar
     k_2 = 1 + x_bar * x_bar - 2 * x_bar
-    return (1 - k_1/x) if x > x_bar else k_2 / (1 - k_1)
+    return (1 - k_1/x) if x > x_bar else k_2 / (1 - x)
 
 class ShiftSigmoid(torch.autograd.Function):
     @staticmethod
